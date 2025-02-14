@@ -9,10 +9,11 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      # Устанавливаем Node.js
+      # Устанавливаем Node.js 18
       - uses: actions/setup-node@v2
         with:
-          node-version: '16' # Укажите версию Node.js, которую используете
+          node-version: '18' # Используем Node.js 18
+          cache: 'pnpm' # Кешируем pnpm для ускорения сборки
 
       # Устанавливаем pnpm через corepack
       - name: Install pnpm
