@@ -13,7 +13,6 @@ jobs:
       - uses: actions/setup-node@v2
         with:
           node-version: '16' # Укажите версию Node.js, которую используете
-          cache: 'pnpm' # Кешируем pnpm для ускорения сборки
 
       # Устанавливаем pnpm через corepack
       - name: Install pnpm
