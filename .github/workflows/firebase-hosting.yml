@@ -14,11 +14,10 @@ jobs:
         with:
           node-version: '18' # Используем Node.js 18
 
-      # Устанавливаем pnpm через corepack
+      # Устанавливаем pnpm через npm
       - name: Install pnpm
         run: |
-          corepack enable
-          corepack prepare pnpm@latest --activate
+          npm install -g pnpm
           echo "pnpm version: $(pnpm -v)" # Проверяем, что pnpm установлен
 
       # Устанавливаем зависимости
