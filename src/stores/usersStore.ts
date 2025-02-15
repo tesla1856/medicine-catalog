@@ -1,91 +1,95 @@
 import { defineStore } from 'pinia'
 import { db, auth } from '@/firebase'
-import { doc, updateDoc, getDoc } from 'firebase/firestore'
-import { onAuthStateChanged } from 'firebase/auth'
+import { doc, setDoc, updateDoc, getDoc, arrayUnion, arrayRemove } from 'firebase/firestore'
+import { onAuthStateChanged, signOut, signInWithPopup, GoogleAuthProvider } from 'firebase/auth'
 import type { FieldValue } from 'firebase/firestore'
-import type { User } from '@/types/users'
+import type { User } from '@/types'
+import { useApothekeStore } from '@/stores/apothekeStore'
 
 export const useUsersStore = defineStore('user', {
   state: () => ({
-    currentUser: null as string | null, // Текущий пользователь (email)
+    currentUser: null as string | null,
   }),
   getters: {
-    getCurrentUser: (state) => state.currentUser, // Геттер для текущего пользователя
+    getCurrentUser: (state) => state.currentUser,
   },
   actions: {
-    // Инициализация слушателя авторизации
     initAuthListener() {
-      onAuthStateChanged(auth, (user) => {
-        this.currentUser = user ? user.email : null // Сохраняем email текущего пользователя
+      const apothekeStore = useApothekeStore()
+      onAuthStateChanged(auth, async (user) => {
+        if (user && user.email) {
+          this.currentUser = user.email
+          await apothekeStore.fetchUserApothekes(this.currentUser)
+        } else {
+          this.currentUser = null
+          apothekeStore.apothekes = []
+        }
       })
     },
 
-    // Поиск пользователя по email
-    async findUserByEmail(email: string) {
-      const userDoc = await getDoc(doc(db, 'users', email)) // Используем email как ID документа
+    async createUserIfNotExists(email: string) {
+      const userRef = doc(db, 'users', email)
+      const userDoc = await getDoc(userRef)
+
       if (!userDoc.exists()) {
-        return null
+        await setDoc(userRef, {
+          email,
+          apothekes: [],
+          sharedUsers: [],
+        })
       }
-      return userDoc.data() as User
     },
 
-    // Предоставление доступа к аптечке
-    async shareApotheke(ownerEmail: string, apothekeId: string, sharedUserEmail: string) {
+    async signInWithGoogle() {
+      const provider = new GoogleAuthProvider()
       try {
-        const userRef = doc(db, 'users', ownerEmail)
-        const userDoc = await getDoc(userRef)
-
-        if (!userDoc.exists()) {
-          throw new Error('Пользователь не найден')
-        }
-
-        const sharedWith = userDoc.data().sharedWith || {}
-        if (!sharedWith[sharedUserEmail]) {
-          sharedWith[sharedUserEmail] = []
-        }
-
-        // Проверяем, что аптечка ещё не добавлена
-        if (!sharedWith[sharedUserEmail].includes(apothekeId)) {
-          sharedWith[sharedUserEmail].push(apothekeId)
-          await updateDoc(userRef, { sharedWith })
+        const result = await signInWithPopup(auth, provider)
+        if (result.user.email) {
+          this.currentUser = result.user.email
+          await this.createUserIfNotExists(result.user.email)
         }
       } catch (error) {
-        console.error('Ошибка при предоставлении доступа:', error)
-        throw error
+        console.error('Ошибка авторизации:', error)
       }
     },
 
-    // Отзыв доступа к аптечке
-    async revokeAccess(ownerEmail: string, apothekeId: string, sharedUserEmail: string) {
-      try {
-        const userRef = doc(db, 'users', ownerEmail)
-        const userDoc = await getDoc(userRef)
-
-        if (!userDoc.exists()) {
-          throw new Error('Пользователь не найден')
-        }
-
-        const sharedWith = userDoc.data().sharedWith || {}
-        if (sharedWith[sharedUserEmail]) {
-          // Удаляем ID аптечки из массива
-          sharedWith[sharedUserEmail] = sharedWith[sharedUserEmail].filter(
-            (id: string) => id !== apothekeId,
-          )
-          await updateDoc(userRef, { sharedWith })
-        }
-      } catch (error) {
-        console.error('Ошибка при отзыве доступа:', error)
-        throw error
-      }
-    },
+    // async findUserByEmail(email: string) {
+    //   const userDoc = await getDoc(doc(db, 'users', email)) // Используем email как ID документа
+    //   if (!userDoc.exists()) {
+    //     return null
+    //   }
+    //   return userDoc.data() as User
+    // },
 
     // Обновление данных пользователя
-    async updateUser(
-      email: string,
-      data: Partial<Omit<User, 'apothekes'> & { apothekes?: FieldValue }>,
-    ) {
-      const userRef = doc(db, 'users', email)
-      await updateDoc(userRef, data)
+    // async updateUser(
+    //   email: string,
+    //   data: Partial<Omit<User, 'apothekes'> & { apothekes?: FieldValue }>,
+    // ) {
+    //   const userRef = doc(db, 'users', email)
+    //   await updateDoc(userRef, data)
+    // },
+
+    async logout() {
+      try {
+        await signOut(auth) // Выход из системы
+        this.currentUser = null // Сбрасываем текущего пользователя
+      } catch (error) {
+        console.error('Ошибка при выходе:', error)
+      }
+    },
+
+    async shareAccess(ownerEmail: string, sharedEmail: string) {
+      const userRef = doc(db, 'users', ownerEmail)
+      await updateDoc(userRef, {
+        sharedUsers: arrayUnion(sharedEmail),
+      })
+    },
+    async revokeAccess(ownerEmail: string, sharedEmail: string) {
+      const userRef = doc(db, 'users', ownerEmail)
+      await updateDoc(userRef, {
+        sharedUsers: arrayRemove(sharedEmail),
+      })
     },
   },
 })

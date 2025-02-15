@@ -1,6 +1,5 @@
 <template>
   <div>
-    <h1>Домашняя аптечка</h1>
     <ApothekeManager />
   </div>
 </template>

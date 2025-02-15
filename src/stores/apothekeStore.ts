@@ -6,71 +6,56 @@ import {
   addDoc,
   updateDoc,
   deleteDoc,
-  getDoc,
+  getDocs,
+  query,
+  where,
   arrayUnion,
-  arrayRemove,
 } from 'firebase/firestore'
-import { useUsersStore } from '@/stores/usersStore'
-import type { Apotheke, Medicine } from '@/types/apothekes'
+import type { Apotheke, Medicine } from '@/types'
 
 export const useApothekeStore = defineStore('apotheke', {
   state: () => ({
     apothekes: [] as Apotheke[], // Список аптечек
   }),
   actions: {
-    // Загрузка аптечек по их ID
-    async fetchApothekes(apothekeIds: string[]) {
-      const apothekePromises = apothekeIds.map(async (id) => {
-        const apothekeDoc = await getDoc(doc(db, 'apothekes', id))
-        if (apothekeDoc.exists()) {
-          return { id: apothekeDoc.id, ...apothekeDoc.data() } as Apotheke
-        }
-        return null
-      })
+    async fetchUserApothekes(ownerEmail: string) {
+      console.log('feach', { ownerEmail })
 
-      const apothekes = (await Promise.all(apothekePromises)).filter(
-        (apotheke): apotheke is Apotheke => apotheke !== null,
-      )
-      this.apothekes = apothekes
+      const q = query(collection(db, 'apothekes'), where('ownerEmail', '==', ownerEmail))
+      const querySnapshot = await getDocs(q)
+      this.apothekes = querySnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Apotheke)
     },
 
-    // Добавление новой аптечки
     async addApotheke(name: string, ownerEmail: string) {
-      const newApotheke = {
-        name,
-        medicines: [], // Пустой массив для лекарств
+      try {
+        const newApotheke = {
+          name,
+          ownerEmail,
+          medicines: [],
+        }
+
+        const apothekeRef = await addDoc(collection(db, 'apothekes'), newApotheke)
+
+        const userRef = doc(db, 'users', ownerEmail)
+        await updateDoc(userRef, {
+          apothekes: arrayUnion(apothekeRef.id), // Добавляем ID аптечки в массив владельца
+        })
+
+        // Добавляем аптечку в локальное состояние
+        this.apothekes.push({ id: apothekeRef.id, ...newApotheke })
+      } catch (error) {
+        console.error('Ошибка при добавлении аптечки:', error)
+        throw error // Пробрасываем ошибку для обработки в компоненте
       }
-
-      // Добавляем аптечку в Firestore
-      const apothekeRef = await addDoc(collection(db, 'apothekes'), newApotheke)
-
-      // Обновляем документ пользователя, добавляя ID новой аптечки
-      const userStore = useUsersStore()
-      await userStore.updateUser(ownerEmail, {
-        apothekes: arrayUnion(apothekeRef.id),
-      })
-
-      // Добавляем аптечку в состояние
-      this.apothekes.push({ id: apothekeRef.id, ...newApotheke })
     },
 
-    // Удаление аптечки
     async removeApotheke(apothekeId: string, ownerEmail: string) {
-      // Удаляем аптечку из Firestore
       await deleteDoc(doc(db, 'apothekes', apothekeId))
-
-      // Обновляем документ пользователя, удаляя ID аптечки
-      const userStore = useUsersStore()
-      await userStore.updateUser(ownerEmail, {
-        apothekes: arrayRemove(apothekeId),
-      })
-
-      // Удаляем аптечку из состояния
-      this.apothekes = this.apothekes.filter((apotheke) => apotheke.id !== apothekeId)
+      this.apothekes = this.apothekes.filter((a) => a.id !== apothekeId)
     },
 
     // Добавление лекарства в аптечку
-    async addMedicine({ apothekeId, medicine }: { apothekeId: string; medicine: Medicine }) {
+    async addMedicine(apothekeId: string, medicine: Medicine) {
       const apothekeRef = doc(db, 'apothekes', apothekeId)
       const apotheke = this.apothekes.find((apotheke) => apotheke.id === apothekeId)
 
@@ -85,13 +70,21 @@ export const useApothekeStore = defineStore('apotheke', {
     },
 
     // Удаление лекарства из аптечки
-    async removeMedicine({ apothekeId, medicineId }: { apothekeId: string; medicineId: string }) {
+    async removeMedicine({
+      apothekeId,
+      medicineName,
+    }: {
+      apothekeId: string
+      medicineName: string
+    }) {
       const apothekeRef = doc(db, 'apothekes', apothekeId)
       const apotheke = this.apothekes.find((apotheke) => apotheke.id === apothekeId)
 
       if (apotheke) {
         // Фильтруем лекарства
-        const updatedMedicines = apotheke.medicines.filter((medicine) => medicine.id !== medicineId)
+        const updatedMedicines = apotheke.medicines.filter(
+          (medicine) => medicine.name !== medicineName,
+        )
         await updateDoc(apothekeRef, { medicines: updatedMedicines })
 
         // Обновляем состояние

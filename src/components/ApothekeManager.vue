@@ -3,60 +3,52 @@
     <h1>Управление аптечками</h1>
     <input v-model="newApothekeName" placeholder="Название аптечки" />
     <button @click="addApotheke">Добавить аптечку</button>
-
     <ul>
       <li v-for="apotheke in apothekes" :key="apotheke.id">
         <router-link :to="`/apotheke/${apotheke.id}`">
           {{ apotheke.name }}
         </router-link>
-        <button @click="removeApotheke(apotheke.id)">Удалить</button>
-        <input v-model="sharedEmails[apotheke.id]" placeholder="Введите email пользователя" />
-        <button @click="grantAccess(apotheke.id)">Предоставить доступ</button>
-        <button @click="revokeAccess(apotheke.id)">Отозвать доступ</button>
+        <button @click="removeApotheke(apotheke.id)" class="icon-button">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M3 6h18" />
+            <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+            <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+            <line x1="10" y1="11" x2="10" y2="17" />
+            <line x1="14" y1="11" x2="14" y2="17" />
+          </svg>
+        </button>
       </li>
     </ul>
+    <input v-model="sharedUserEmail" placeholder="Введите email пользователя" />
+    <button @click="grantAccess">Предоставить доступ</button>
+    <button @click="revokeAccess">Отозвать доступ</button>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref } from 'vue'
 import { useUsersStore } from '@/stores/usersStore'
 import { useApothekeStore } from '@/stores/apothekeStore'
 import { storeToRefs } from 'pinia'
-import { doc, getDoc } from 'firebase/firestore' // Импортируем getDoc и doc
-import { db } from '@/firebase' // Импортируем db
 
-// Хранилища
-const usersStore = useUsersStore()
+const userStore = useUsersStore()
 const apothekeStore = useApothekeStore()
-
-// Реактивные данные
-const newApothekeName = ref('')
-const sharedEmails = ref<Record<string, string>>({})
-
-// Получаем текущего пользователя
-const { currentUser } = storeToRefs(usersStore)
-
-// Получаем список аптечек
+const { currentUser } = storeToRefs(userStore)
 const { apothekes } = storeToRefs(apothekeStore)
 
-// Загружаем аптечки при монтировании компонента
-onMounted(async () => {
-  if (currentUser.value) {
-    // Получаем документ пользователя по email
-    const userDoc = await getDoc(doc(db, 'users', currentUser.value))
-    if (userDoc.exists()) {
-      const userData = userDoc.data()
-      const apothekeIds = [
-        ...(userData.apothekes || []),
-        ...Object.values(userData.sharedWith || {}).flat(),
-      ]
-      await apothekeStore.fetchApothekes(apothekeIds)
-    }
-  }
-})
+const newApothekeName = ref('')
+const sharedUserEmail = ref('')
 
-// Добавление аптечки
 const addApotheke = async () => {
   if (newApothekeName.value.trim() && currentUser.value) {
     await apothekeStore.addApotheke(newApothekeName.value, currentUser.value)
@@ -64,32 +56,43 @@ const addApotheke = async () => {
   }
 }
 
-// Удаление аптечки
 const removeApotheke = async (apothekeId: string) => {
   if (currentUser.value) {
     await apothekeStore.removeApotheke(apothekeId, currentUser.value)
   }
 }
 
-// Предоставление доступа к аптечке
-const grantAccess = async (apothekeId: string) => {
-  const email = sharedEmails.value[apothekeId]
-  if (email && currentUser.value) {
-    const sharedUser = await usersStore.findUserByEmail(email)
-    if (sharedUser) {
-      await usersStore.shareApotheke(currentUser.value, apothekeId, sharedUser.email)
-    }
+const grantAccess = async () => {
+  if (sharedUserEmail.value && currentUser.value) {
+    await userStore.shareAccess(currentUser.value, sharedUserEmail.value)
   }
 }
 
-// Отзыв доступа к аптечке
-const revokeAccess = async (apothekeId: string) => {
-  const email = sharedEmails.value[apothekeId]
-  if (email && currentUser.value) {
-    const sharedUser = await usersStore.findUserByEmail(email)
-    if (sharedUser) {
-      await usersStore.revokeAccess(currentUser.value, apothekeId, sharedUser.email)
-    }
+const revokeAccess = async () => {
+  if (sharedUserEmail.value && currentUser.value) {
+    await userStore.revokeAccess(currentUser.value, sharedUserEmail.value)
   }
 }
 </script>
+
+<style>
+.icon-button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  margin-left: 0.5rem;
+  display: inline-flex;
+  align-items: center;
+}
+
+.icon-button svg {
+  width: 20px;
+  height: 20px;
+  color: #ff4d4d; /* Цвет иконки */
+}
+
+.icon-button:hover svg {
+  color: #ff1a1a; /* Цвет иконки при наведении */
+}
+</style>

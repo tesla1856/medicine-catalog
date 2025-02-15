@@ -8,17 +8,14 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import { useRouter } from 'vue-router'
-import { auth, googleProvider, signInWithPopup } from '@/firebase'
+import { useUsersStore } from '@/stores/usersStore'
 
+const userStore = useUsersStore()
 const error = ref('')
-const router = useRouter()
 
 const signInWithGoogle = async () => {
   try {
-    const result = await signInWithPopup(auth, googleProvider)
-    console.log('Пользователь авторизован:', result.user)
-    router.push('/')
+    await userStore.signInWithGoogle()
   } catch (err) {
     error.value = 'Ошибка авторизации: ' + (err as Error).message
   }

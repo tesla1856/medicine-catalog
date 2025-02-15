@@ -38,7 +38,7 @@ router.beforeEach(async (to, from, next) => {
   const auth = getAuth() // Получаем экземпляр Firebase Auth
 
   // Проверяем, требует ли маршрут авторизации
-  const requiresAuth = to.matched.some((record) => record.meta.requiresAuth)
+  const requiresAuth = to.matched.some((route) => route.meta.requiresAuth)
 
   // Если маршрут не требует авторизации, разрешаем доступ
   if (!requiresAuth) {
