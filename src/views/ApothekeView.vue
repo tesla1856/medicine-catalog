@@ -10,7 +10,7 @@
 import { computed } from 'vue'
 import { useApothekeStore } from '@/stores/apothekeStore'
 import MedicineManager from '@/components/MedicineManager.vue'
-import type { Apotheke } from '@/types/types'
+import type { Apotheke } from '@/types/apothekes'
 
 // Получаем параметр `id` из маршрута
 const props = defineProps<{

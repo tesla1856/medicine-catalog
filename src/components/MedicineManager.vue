@@ -17,7 +17,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useApothekeStore } from '@/stores/apothekeStore'
-import type { Apotheke } from '@/types/types'
+import type { Apotheke } from '@/types/apothekes'
 
 // Определяем пропсы
 const props = defineProps<{
