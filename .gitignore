@@ -1,5 +1,5 @@
 /.firebase/
-/.tools/
+/.tools/*.txt
 
 # Logs
 logs
