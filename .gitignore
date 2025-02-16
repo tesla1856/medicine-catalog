@@ -1,3 +1,6 @@
+/.firebase/
+/.tools/
+
 # Logs
 logs
 *.log
